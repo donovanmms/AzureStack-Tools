@@ -29,7 +29,7 @@ The Azure Stack Development Kit installer UI script is based on PowerShell and t
 
 #region Text
 $Text_Generic = @{}
-$Text_Generic.Version = "1.0.13"
+$Text_Generic.Version = "1.0.14"
 $Text_Generic.Password_NotMatch = "Passwords do not match"
 $Text_Generic.Regex_Fqdn = "<yourtenant.onmicrosoft.com> can only contain A-Z, a-z, 0-9, dots and a hyphen"
 $Text_Generic.Regex_Computername = "Computername must be 15 characters or less and can only contain A-Z, a-z, 0-9 and a hyphen"
@@ -43,7 +43,7 @@ $Text_SafeOS.Mode_LeftTitle = "Prepare Environment"
 $Text_SafeOS.Mode_LeftContent = "Prepare the Cloudbuilder vhdx"
 $Text_SafeOS.Mode_TopRightTitle = "Online documentation"
 $Text_SafeOS.Mode_TopRightContent = "Read the online documentation."
-$Text_SafeOS.Prepare_Title = "Select Cloudbuilder vhdx"
+$Text_SafeOS.Prepare_Title = "Select extracted Azure Stack Development Kit root folder"
 $Text_SafeOS.Prepare_VHDX_IsMounted = "This vhdx is already mounted"
 $Text_SafeOS.Prepare_VHDX_InvalidPath = "Not a valid Path"
 $Text_SafeOS.Prepare_Drivers_InvalidPath = "Not a valid Path"
@@ -68,7 +68,7 @@ $Text_Install.Reboot_Title = "Reboot"
 $Text_Install.NetInterface_Title = "Select Network Interface for the Azure Stack host"
 $Text_Install.NetInterface_Warning = "Only one adapter can be used for the Azure Stack Development Kit host. Select the adapter used for the deployment. All other adapters will be disabled by the installer. Ensure you have network connectivity to the selected network adapter before proceeding."
 $Text_Install.NetConfig_Title = "Network Configuration"
-$Text_Install.Credentials_Title = "Specify Identity Provider and Credentials"
+$Text_Install.Credentials_Title = "Specify Credentials"
 $Text_Install.Restore_Title = "Backup settings"
 $Text_Install.Summary_Title = "Summary"
 $Text_Install.Summary_Content = "The following script will be used for deploying the Development Kit"
@@ -1003,7 +1003,7 @@ $Xaml = @'
                 <!--#region Prepare-->
                 <StackPanel x:Name="Control_Prepare_Stp" HorizontalAlignment="Left" Visibility="Collapsed">
                     <StackPanel Height="320">
-                        <TextBlock FontSize="16" FontFamily="Segoe UI" Text="Cloudbuilder.vhdx" Margin="0,0,0,10" />
+                        <TextBlock FontSize="16" FontFamily="Segoe UI" Text="AzureStackDevelopmentKit folder" Margin="0,0,0,10" />
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                             <TextBox x:Name="Control_Prepare_Tbx_Vhdx" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" Width="440" />
                             <Button x:Name="Control_Prepare_Btn_Vhdx" Content="Browse" Width="100" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0,0,0" />
@@ -1049,24 +1049,10 @@ $Xaml = @'
                         <Button x:Name="Control_Unattend_Btn_Next" Content="Next" Height="23.5" Width="100" Margin="10,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center" IsEnabled="False"/>
                     </StackPanel>
                 </StackPanel>
-                <!--#endregion Prepare-->
+                <!--#endregion Unattend-->
                 <!--#region Credentials-->
                 <StackPanel x:Name="Control_Creds_Stp" HorizontalAlignment="Left" Visibility="Collapsed">
                     <StackPanel Height="320">
-                        <TextBlock FontSize="16" FontFamily="Segoe UI"  Text="Identity Provider" Margin="0,0,0,10"/>
-
-
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                            <TextBlock x:Name="Control_Creds_Tbl_Idp" FontSize="14" FontFamily="Segoe UI"  Text="Type:" Width="120" HorizontalAlignment="Left"/>
-                            <ComboBox Width="430" x:Name="Control_Creds_Cbx_Idp" FontFamily="Segoe UI" FontSize="14" AutomationProperties.LabeledBy="{Binding ElementName=Control_Creds_Tbl_Idp}" >
-                            </ComboBox>
-                        </StackPanel>
-                        <StackPanel x:Name="Control_Creds_Stp_AAD" Visibility="Visible">
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <TextBlock x:Name="Control_Creds_Tbl_AADTenant" FontSize="14" FontFamily="Segoe UI"  Text="AAD Directory:" Width="120" HorizontalAlignment="Left"/>
-                                <TextBox x:Name="Control_Creds_Tbx_AADTenant" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" Width="430" IsEnabled="False" AutomationProperties.LabeledBy="{Binding ElementName=Control_Creds_Tbl_AADTenant}" />
-                            </StackPanel>
-                        </StackPanel>
                         <StackPanel x:Name="Control_Creds_Stp_LocalPassword" Visibility="Visible">
                             <TextBlock x:Name="Control_Creds_Tbl_LocalAdminPassword"  FontSize="16" FontFamily="Segoe UI"  Text="Local Administrator Password" Margin="0,0,0,10"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
@@ -1383,22 +1369,9 @@ $syncHash.Control_Header_Tbl_Version.Text = $Text_Generic.Version
 
 #region AuthEndpoints
 $AuthEndpoints = @{
-    'Azure Cloud'= @{
-        'Endpoint'='https://login.windows.net'
-        }
-    'Azure China Cloud'= @{
-        'Endpoint'='https://login.chinacloudapi.cn'
-        }
-    'Azure US Government Cloud'= @{ 
-        'Endpoint'= 'https://login.microsoftonline.us'
-        }
     'ADFS'= @{
         'Endpoint'='https://adfs.local.azurestack.external'
         }
-}
-
-$AuthEndpoints.GetEnumerator() | ForEach-Object {
-$syncHash.Control_Creds_Cbx_Idp.AddChild($_.Key)
 }
 #endregion AuthEndpoints
 
@@ -1471,18 +1444,57 @@ $S_PrepareVHDX = {
     $Prepare_HardDisk_Size = [math]::truncate((get-volume -DriveLetter $Prepare_HardDisk_DriveLetter).Size / 1GB)
     $Prepare_HardDisk_SizeRemaining = [math]::truncate((get-volume -DriveLetter $Prepare_HardDisk_DriveLetter).SizeRemaining / 1GB)
     $Prepare_Vhdx_Size = [math]::truncate((Get-Item $Prepare_Vhdx_Path).Length / 1GB)
-    $Prepare_HardDisk_SizeReq = 120
+    $Prepare_HardDisk_SizeReq = 150
     $Prepare_HardDisk_ActualReq = ($Prepare_HardDisk_SizeReq - $Prepare_Vhdx_Size)
 
     #Error
     if (($Prepare_HardDisk_SizeReq - $Prepare_Vhdx_Size) -ge $Prepare_HardDisk_SizeRemaining)
-        {
-        $Prepare_details = "Cloudbuilder.vhdx is placed on $Prepare_HardDisk_DriveLetter. When you boot from CloudBuilder.vhdx the virtual hard disk will be expanded to its full size of $Prepare_HardDisk_SizeReq GB. $Prepare_HardDisk_DriveLetter does not contain enough free space. You need $Prepare_HardDisk_ActualReq GB of free disk space for a succesfull boot from CloudBuilder.vhdx, but $Prepare_HardDisk_DriveLetter only has $Prepare_HardDisk_SizeRemaining GB remaining. Ensure Cloudbuilder.vhdx is placed on a local disk that contains enough free space and rerun this script."
+    {
+        $Prepare_details = "ASDK is placed on $Prepare_HardDisk_DriveLetter. $Prepare_HardDisk_DriveLetter does not contain enough free space. You need $Prepare_HardDisk_ActualReq GB of free disk space for a succesfull ASDK installation, but $Prepare_HardDisk_DriveLetter only has $Prepare_HardDisk_SizeRemaining GB remaining. Ensure ASDK is placed on a local disk that contains enough free space and rerun this script."
         $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add("Error: Insufficient disk space")},"Normal")
         $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add((New-Object System.Windows.Documents.LineBreak))},"Normal")
         $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add($Prepare_details)},"Normal")
         Break
-        }
+    }
+
+    $CloudBuilder_Vhdx_Path = Join-Path -Path $Prepare_Vhdx_Path -ChildPath 'Stamp\v-DVM\Virtual Hard Disks\CloudBuilder.vhdx'
+    if (!(Test-Path -Path $CloudBuilder_Vhdx_Path -PathType Leaf))
+    {
+        $Prepare_details = "Can't find CloudBuilder.vhdx under the ASDK path $CloudBuilder_Vhdx_Path. Please download the completed ASDK files and rerun this script. If compressed ASDK is downloaded instead, please extract it first."
+        $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add("Error: Invalid ASDK")},"Normal")
+        $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add((New-Object System.Windows.Documents.LineBreak))},"Normal")
+        $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add($Prepare_details)},"Normal")
+        Break
+    }
+
+    if ((Get-DiskImage -ImagePath $CloudBuilder_Vhdx_Path).Attached) {
+        $Prepare_details = "$CloudBuilder_Vhdx_Path is already mounted. Please dismount it and rerun this script."
+        $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add("Error: VHDX is mounted")},"Normal")
+        $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add((New-Object System.Windows.Documents.LineBreak))},"Normal")
+        $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add($Prepare_details)},"Normal")
+        Break
+    }
+
+    $VirtualHost_Path = Join-Path -Path $Prepare_Vhdx_Path -ChildPath 'VirtualHost'
+    $Destination_Vhdx_Path = Join-Path -Path $VirtualHost_Path -ChildPath 'CloudBuilder.vhdx'
+
+    if ((Test-Path -Path $Destination_Vhdx_Path -PathType Leaf) -and (Get-DiskImage -ImagePath $Destination_Vhdx_Path).Attached)
+    {
+        $Prepare_details = "$Destination_Vhdx_Path is already mounted. Please dismount it and rerun this script."
+        $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add("Error: VHDX is mounted")},"Normal")
+        $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add((New-Object System.Windows.Documents.LineBreak))},"Normal")
+        $syncHash.Control_Job_Tbl_Details.Dispatcher.Invoke([action]{$syncHash.Control_Job_Tbl_Details.Inlines.Add($Prepare_details)},"Normal")
+        Break
+    }
+
+    if (Test-Path -Path $VirtualHost_Path)
+    {
+        Remove-Item -Path $VirtualHost_Path -Recurese -Force
+    }
+
+    New-Item -ItemType Directory -Force -Path $VirtualHost_Path | Out-Null
+    Copy-Item -Path $CloudBuilder_Vhdx_Path -Destination $VirtualHost_Path -Force
+    $Prepare_Vhdx_Path = $Destination_Vhdx_Path
     #endregion
 
     #region Remove boot from previous deployment
@@ -1708,14 +1720,14 @@ $S_PrepareVHDX = {
     #endregion oobeSystem
 
     
-    if($Unattend_Apply_LocalAdmin) {
+    if($Unattend_Apply_LocalAdmin) {
         $U_Unattend.unattend.AppendChild($U_Unattend.ImportNode($U_Unattend_oobeSysten_AdminPassword.unattend.settings, $true))
-        }
+        }
 
-    if($Unattend_Apply_StaticIP) {
+    if($Unattend_Apply_StaticIP) {
         ($U_Unattend.unattend.settings | Where-Object {$_.pass -eq 'Specialize'}).AppendChild($U_Unattend.ImportNode($U_Unattend_specialize_IPAddress.unattend.settings.component, $true))
         ($U_Unattend.unattend.settings | Where-Object {$_.pass -eq 'Specialize'}).AppendChild($U_Unattend.ImportNode($U_Unattend_specialize_DNS.unattend.settings.component, $true))
-        }
+        }
 
     $U_Unattend.OuterXml | Out-File ($Prepare_Vhdx_DriveLetter+":\unattend.xml") -Encoding ascii -Force
     #endregion
@@ -1816,9 +1828,9 @@ $S_NetbxndaOffline = {
 $Runspace_Jobs_Properties =[runspacefactory]::CreateRunspace()
 $Runspace_Jobs_Properties.Name = "Jobs"
 $Runspace_Jobs_Properties.ApartmentState = "STA"
-$Runspace_Jobs_Properties.ThreadOptions = "ReuseThread"         
+$Runspace_Jobs_Properties.ThreadOptions = "ReuseThread"         
 $Runspace_Jobs_Properties.Open()
-$Runspace_Jobs_Properties.SessionStateProxy.SetVariable("syncHash",$syncHash)  
+$Runspace_Jobs_Properties.SessionStateProxy.SetVariable("syncHash",$syncHash)  
 $Runspace_Jobs = [PowerShell]::Create()
 #endregion
 
@@ -1835,7 +1847,7 @@ Function F_Initialize {
     Write-Host "." -NoNewline -ForegroundColor Cyan
 
     # Get environment details CloudBuilder
-    if (test-path "C:\CloudDeployment\Setup\InstallAzureStackPOC.ps1") {
+    if (test-path "C:\CloudDeployment\Setup\InstallAzureStack.ps1") {
         if(!(test-path "C:\CloudDeployment\ECEngine\EnterpriseCloudEngine.psd1")) {
             # Deployment not initialized
             $Script:Initialized="CloudBuilder_Install"
@@ -1844,8 +1856,8 @@ Function F_Initialize {
             $syncHash.Control_Mode_Tbl_LeftContent.Text = $Text_Install.Mode_LeftContent
 
             # Show Reboot and recover options
-            $syncHash.Control_Mode_Btn_TopRight.VerticalAlignment = "Top"
-            $syncHash.Control_Mode_Btn_BottomRight.Visibility = "Visible"
+            $syncHash.Control_Mode_Btn_TopRight.VerticalAlignment = "Stretch"
+            $syncHash.Control_Mode_Btn_BottomRight.Visibility = "Collapsed"
             $syncHash.Control_Mode_Tbl_BottomRightTitle.Text = $Text_Install.Mode_BottomRightTitle
             $syncHash.Control_Mode_Tbl_BottomRightContent.Text = $Text_Install.Mode_BottomRightContent
         }
@@ -1864,8 +1876,8 @@ Function F_Initialize {
                 $syncHash.Control_Mode_Tbl_LeftContent.Text = $Text_Install.Mode_LeftContent
 
                 # Show Reboot and recover options
-                $syncHash.Control_Mode_Btn_TopRight.VerticalAlignment = "Top"
-                $syncHash.Control_Mode_Btn_BottomRight.Visibility = "Visible"
+                $syncHash.Control_Mode_Btn_TopRight.VerticalAlignment = "Stretch"
+                $syncHash.Control_Mode_Btn_BottomRight.Visibility = "Collapsed"
                 $syncHash.Control_Mode_Tbl_BottomRightTitle.Text = $Text_Install.Mode_BottomRightTitle
                 $syncHash.Control_Mode_Tbl_BottomRightContent.Text = $Text_Install.Mode_BottomRightContent
             }
@@ -2056,20 +2068,11 @@ Function F_Verify_LocalAdminCreds {
 
 Function F_VerifyFields_Creds {
     if ($Script:Restore -and
-        ($syncHash.Control_Creds_Pwb_LocalPassword.Password.Length -gt 0) -and
-        ($syncHash.Control_Creds_Tbx_AADTenant.Text -and ($syncHash.Control_Creds_Tbx_AADTenant.BorderBrush.color -ne "#FFFF0000")))
+        ($syncHash.Control_Creds_Pwb_LocalPassword.Password.Length -gt 0))
     {
         $syncHash.Control_Creds_Btn_Next.IsEnabled = $true
     }
-    elseif (
-        ($syncHash.Control_Creds_Cbx_Idp.SelectedItem -eq 'ADFS' -and
-        ($syncHash.Control_Creds_Pwb_LocalPassword.Password.Length -gt 0)) -or
-        (
-        $syncHash.Control_Creds_Cbx_Idp.SelectedItem -ne 'ADFS' -and
-        $syncHash.Control_Creds_Cbx_Idp.SelectedItem -and
-        ($syncHash.Control_Creds_Tbx_AADTenant.Text -and ($syncHash.Control_Creds_Tbx_AADTenant.BorderBrush.color -ne "#FFFF0000")) -and
-        ($syncHash.Control_Creds_Pwb_LocalPassword.Password.Length -gt 0))
-    ) {
+    elseif ($syncHash.Control_Creds_Pwb_LocalPassword.Password.Length -gt 0) {
         $syncHash.Control_Creds_Btn_Next.IsEnabled = $true
     }
     Else {
@@ -2158,40 +2161,40 @@ Function F_CopyNicProperties {
 }
 
 Function F_GetNetworkID {
-    $CIDRIPAddress = $syncHash.Control_NetConfig_Tbx_IpAddress.Text
+    $CIDRIPAddress = $syncHash.Control_NetConfig_Tbx_IpAddress.Text
 
     $ipBinary = $null
     $dottedDecimal = $null
 
-    $IPAddress = $CIDRIPAddress.Split("/")[0] 
-    $cidr = [convert]::ToInt32($CIDRIPAddress.Split("/")[1]) 
+    $IPAddress = $CIDRIPAddress.Split("/")[0] 
+    $cidr = [convert]::ToInt32($CIDRIPAddress.Split("/")[1]) 
 
-    $IPAddress.split(".") | ForEach-Object{$ipBinary=$ipBinary + $([convert]::toString($_,2).padleft(8,"0"))}
+    $IPAddress.split(".") | ForEach-Object{$ipBinary=$ipBinary + $([convert]::toString($_,2).padleft(8,"0"))}
 
-    if($cidr -le 32) {
-        [Int[]]$array = (1..32) 
-        for($i=0;$i -lt $array.length;$i++) { 
-            if($array[$i] -gt $cidr){$array[$i]="0"}else{$array[$i]="1"} 
+    if($cidr -le 32) {
+        [Int[]]$array = (1..32) 
+        for($i=0;$i -lt $array.length;$i++) { 
+            if($array[$i] -gt $cidr){$array[$i]="0"}else{$array[$i]="1"} 
         }
-        $smBinary =$array -join "" 
+        $smBinary =$array -join "" 
     }
 
-    $netBits=$smBinary.indexOf("0") 
-    if ($netBits -ne -1) { 
-        #identify subnet boundaries 
+    $netBits=$smBinary.indexOf("0") 
+    if ($netBits -ne -1) { 
+        #identify subnet boundaries 
         $binary = $($ipBinary.substring(0,$netBits).padright(32,"0"))
         $i = 0
-        do {$dottedDecimal += "." + [string]$([convert]::toInt32($binary.substring($i,8),2)); $i+=8 } while ($i -le 24)
-        $networkID = $dottedDecimal.substring(1) + "/" + $cidr.ToString()
-    } 
-    else { 
-        #identify subnet boundaries 
-        $binary = $($ipBinary) 
+        do {$dottedDecimal += "." + [string]$([convert]::toInt32($binary.substring($i,8),2)); $i+=8 } while ($i -le 24)
+        $networkID = $dottedDecimal.substring(1) + "/" + $cidr.ToString()
+    } 
+    else { 
+        #identify subnet boundaries 
+        $binary = $($ipBinary) 
         $i = 0
-        do {$dottedDecimal += "." + [string]$([convert]::toInt32($binary.substring($i,8),2)); $i+=8 } while ($i -le 24)
+        do {$dottedDecimal += "." + [string]$([convert]::toInt32($binary.substring($i,8),2)); $i+=8 } while ($i -le 24)
 
-        $networkID = $dottedDecimal.substring(1) + "/" + $cidr.ToString()
-    } 
+        $networkID = $dottedDecimal.substring(1) + "/" + $cidr.ToString()
+    } 
 
     return $networkID
 }
@@ -2206,44 +2209,9 @@ Function F_Summary {
         $InstallScript += '$adminpass = ConvertTo-SecureString ' + "'" + ($syncHash.Control_Creds_Pwb_LocalPassword.PasswordChar.ToString() * $syncHash.Control_Creds_Pwb_LocalPassword.Password.Length) +"'" + '-AsPlainText -Force'
         $InstallScript += "`r`n"
 
-        if ($Script:Restore)
-        {
-            $InstallScript += '$backupEncryptionKey = ConvertTo-SecureString ' + "'" + $syncHash.Control_Restore_Tbx_BackupEncryptionKey.Text + "'" + ' -AsPlainText -Force'
-            $InstallScript += "`r`n"
-
-            $InstallScript += '$backupSharePassword = ConvertTo-SecureString ' + "'" + ($syncHash.Control_Restore_Pwb_BackupStorePassword.PasswordChar.ToString() * $syncHash.Control_Restore_Pwb_BackupStorePassword.Password.Length) + "'" + ' -AsPlainText -Force'
-            $InstallScript += "`r`n"
-
-            $InstallScript += '$backupShareCred = New-Object System.Management.Automation.PSCredential(' + "'" + $syncHash.Control_Restore_Tbx_BackupStoreUserName.Text + "'" + ', $backupSharePassword)'
-            $InstallScript += "`r`n"
-
-            $InstallScript += '$externalCertPassword = ConvertTo-SecureString ' + "'" + $syncHash.Control_Restore_Pwb_ExternalCertPassword.PasswordChar.ToString() * $syncHash.Control_Restore_Pwb_ExternalCertPassword.Password.Length + "'" + ' -AsPlainText -Force'
-            $InstallScript += "`r`n"
-        }
-
         $InstallScript += 'cd C:\CloudDeployment\Setup'
         $InstallScript += "`r`n"
-        $InstallScript += '.\InstallAzureStackPOC.ps1 -AdminPassword $adminpass'
-
-        # Azure Cloud, Azure China Cloud, Azure US Government Cloud or ADFS
-        If (($synchash.Control_Creds_Cbx_Idp.SelectedItem -eq 'Azure Cloud' -or $Script:Restore) -and
-            ![string]::IsNullOrEmpty($synchash.Control_Creds_Tbx_AADTenant.Text)) {
-            $InstallScript += " -InfraAzureDirectoryTenantName "
-            $InstallScript += $synchash.Control_Creds_Tbx_AADTenant.Text
-        }
-        ElseIf ($synchash.Control_Creds_Cbx_Idp.SelectedItem -eq 'Azure China Cloud') {
-                $InstallScript += " -InfraAzureDirectoryTenantName "
-                $InstallScript += $synchash.Control_Creds_Tbx_AADTenant.Text
-                $InstallScript += " -InfraAzureEnvironment AzureChinaCloud"
-        }
-        ElseIf ($synchash.Control_Creds_Cbx_Idp.SelectedItem -eq 'Azure US Government Cloud') {
-                $InstallScript += " -InfraAzureDirectoryTenantName "
-                $InstallScript += $synchash.Control_Creds_Tbx_AADTenant.Text
-                $InstallScript += " -InfraAzureEnvironment AzureUSGovernment"
-        }
-        ElseIf ($synchash.Control_Creds_Cbx_Idp.SelectedItem -eq 'ADFS') {
-                $InstallScript += " -UseADFS"
-        }
+        $InstallScript += '.\InstallVirtualHost.ps1 -AdminPassword $adminpass'
 
         If ($synchash.Control_NetConfig_Tbx_DnsForwarder.Text.Length -gt 0) {
                 $InstallScript += " -DNSForwarder "
@@ -2255,30 +2223,7 @@ Function F_Summary {
             $InstallScript += $synchash.Control_NetConfig_Tbx_TimeServer.Text
         }
 
-        # Restore deployment parameters
-        if ($Script:Restore)
-        {
-            $InstallScript += " -BackupStorePath "
-            $InstallScript += $syncHash.Control_Restore_Tbx_BackupStorePath.Text
-
-            $InstallScript += ' -BackupStoreCredential $backupShareCred'
-
-            $InstallScript += ' -BackupEncryptionKeyBase64 $backupEncryptionKey'
-
-            $InstallScript += " -BackupId "
-            $InstallScript += $syncHash.Control_Restore_Tbx_BackupID.Text
-
-            $InstallScript += ' -ExternalCertPassword $externalCertPassword'
-        }
-
         $syncHash.Control_Summary_Tbx_Content1.Text = $InstallScript
-
-        # Azure Cloud or Azure China Cloud
-        If ($synchash.Control_Creds_Cbx_Idp.SelectedItem -ne 'ADFS') {
-            $syncHash.Control_Summary_Pth_Content1.Visibility = "Visible"
-            $syncHash.Control_Summary_Tbl_Content1.Width = "510"
-            $SyncHash.Control_Summary_Tbl_Content1.Text = $Text_Install.Summary_Warning
-        }
     }
     If ($Script:Initialized -eq "SafeOS") {
         $syncHash.Control_Summary_Tbl_Content1.Text = $Text_SafeOS.Summary_Content
@@ -2314,34 +2259,9 @@ Function F_Install {
            
     '$adminpass = ConvertTo-SecureString ' + "'" + $syncHash.Control_Creds_Pwb_LocalPassword.Password + "'" + ' -AsPlainText -Force' | Add-Content $filepath
 
-    if ($Script:Restore)
-    {
-        '$backupEncryptionKey = ConvertTo-SecureString ' + "'" + $syncHash.Control_Restore_Tbx_BackupEncryptionKey.Text + "'" + ' -AsPlainText -Force' | Add-Content $filepath
-        '$backupSharePassword = ConvertTo-SecureString ' + "'" + $syncHash.Control_Restore_Pwb_BackupStorePassword.Password + "'" + ' -AsPlainText -Force' | Add-Content $filepath
-        '$backupShareCred = New-Object System.Management.Automation.PSCredential(' + "'" + $syncHash.Control_Restore_Tbx_BackupStoreUserName.Text + "'" + ', $backupSharePassword)' | Add-Content $filepath
-        '$externalCertPassword = ConvertTo-SecureString ' + "'" + $syncHash.Control_Restore_Pwb_ExternalCertPassword.Password + "'" + ' -AsPlainText -Force' | Add-Content $filepath
-    }
-
     "cd C:\CloudDeployment\Setup" |  Add-Content $filepath
-    ".\InstallAzureStackPOC.ps1" |  Add-Content $filepath -NoNewline
+    ".\InstallVirtualHost.ps1" |  Add-Content $filepath -NoNewline
     ' -AdminPassword $adminpass' |  Add-Content $filepath -NoNewline
-
-    # Azure Cloud, Azure China Cloud, Azure US Government Cloud or ADFS
-    If (($synchash.Control_Creds_Cbx_Idp.SelectedItem -eq 'Azure Cloud' -or $Script:Restore) -and
-        ![string]::IsNullOrEmpty($synchash.Control_Creds_Tbx_AADTenant.Text)) {
-        ' -InfraAzureDirectoryTenantName "' + $synchash.Control_Creds_Tbx_AADTenant.Text + '"' |  Add-Content $filepath -NoNewline
-    }
-    ElseIf ($synchash.Control_Creds_Cbx_Idp.SelectedItem -eq 'Azure US Government Cloud') {
-        ' -InfraAzureDirectoryTenantName "' + $synchash.Control_Creds_Tbx_AADTenant.Text + '"' |  Add-Content $filepath -NoNewline
-        ' -InfraAzureEnvironment AzureUSGovernment' |  Add-Content $filepath -NoNewline
-    }
-    ElseIf ($synchash.Control_Creds_Cbx_Idp.SelectedItem -eq 'Azure China Cloud') {
-        ' -InfraAzureDirectoryTenantName "' + $synchash.Control_Creds_Tbx_AADTenant.Text + '"' |  Add-Content $filepath -NoNewline
-        ' -InfraAzureEnvironment AzureChinaCloud' |  Add-Content $filepath -NoNewline
-    }
-    ElseIf ($synchash.Control_Creds_Cbx_Idp.SelectedItem -eq 'ADFS') {
-        ' -UseADFS' |  Add-Content $filepath -NoNewline
-    }
 
     If ($synchash.Control_NetConfig_Tbx_DnsForwarder.Text.Length -gt 0) {
         ' -DNSForwarder "' + $synchash.Control_NetConfig_Tbx_DnsForwarder.Text + '"' |  Add-Content $filepath -NoNewline
@@ -2352,15 +2272,6 @@ Function F_Install {
     }
     Else {
         ' -TimeServer "' + 'pool.ntp.org' + '"' |  Add-Content $filepath -NoNewline
-    }
-
-    if ($Script:Restore)
-    {
-        ' -BackupStorePath ' + '"' + $syncHash.Control_Restore_Tbx_BackupStorePath.Text + '"' | Add-Content $filepath -NoNewline
-        ' -BackupStoreCredential $backupShareCred' | Add-Content $filepath -NoNewline
-        ' -BackupEncryptionKeyBase64 $backupEncryptionKey' | Add-Content $filepath -NoNewline
-        ' -BackupId ' + '"' + $syncHash.Control_Restore_Tbx_BackupID.Text + '"' | Add-Content $filepath -NoNewline
-        ' -ExternalCertPassword $externalCertPassword' | Add-Content $filepath -NoNewline
     }
     #endregion
 
@@ -2386,7 +2297,7 @@ Function F_Rerun {
 
     #region Rerun
     Set-Location C:\CloudDeployment\Setup
-    .\InstallAzureStackPOC.ps1 -Rerun
+    .\InstallVirtualHost.ps1 -Rerun
     #endregion
 }
 
@@ -2409,7 +2320,7 @@ $syncHash.Control_Mode_Btn_Left.Add_Click({
         $syncHash.Control_Prepare_Stp.Visibility = "Visible"
         $syncHash.Control_Header_Tbl_Title.Text = $Text_SafeOS.Prepare_Title
     }
-    elseif ($Script:Initialized -eq "CloudBuilder_Install") {        
+    elseif ($Script:Initialized -eq "CloudBuilder_Install") {
         $syncHash.Control_Creds_Stp.Visibility = "Visible"
         $syncHash.Control_Header_Tbl_Title.Text = $Text_Install.Credentials_Title
     }
@@ -2440,12 +2351,6 @@ $syncHash.Control_Mode_Btn_BottomRight.Add_Click({
     $syncHash.Control_Creds_Stp.Visibility = "Visible"
     $syncHash.Control_Header_Tbl_Title.Text = $Text_Install.Credentials_Title
 
-    $syncHash.Control_Creds_Cbx_Idp.AddChild("(Imported from backup data)")
-    $syncHash.Control_Creds_Cbx_Idp.SelectedItem = "(Imported from backup data)"
-    $syncHash.Control_Creds_Cbx_Idp.FontStyle = "Italic"
-    $syncHash.Control_Creds_Cbx_Idp.IsEnabled = $false
-
-    $syncHash.Control_Creds_Tbx_AADTenant.IsEnabled = $true
     $Script:Restore = $true
 })
 
@@ -2457,7 +2362,6 @@ $syncHash.Control_Mode_Btn_TopRight.Add_Click({
         $syncHash.Control_Header_Tbl_Title.Text = $Text_Install.Reboot_Title
         $syncHash.Control_Mode_Stp.Visibility = "Collapsed"
         $syncHash.Control_Reboot_Stp.Visibility = "Visible"
-        $syncHash.Control_Creds_Cbx_Idp.IsEnabled = $true
         F_Reboot_Options
     }
 })
@@ -2477,17 +2381,9 @@ $syncHash.Control_Prepare_Btn_Next.Add_Click({
 })
 
 $syncHash.Control_Prepare_Btn_Vhdx.Add_Click({
-    F_Browse_File -title "Select Cloudbuilder vhdx" -filter "*.vhdx|*.vhdx"
-    if ($Script:F_Browse_obj.FileName) {
-        $syncHash.Control_Prepare_Tbx_Vhdx.Text = $Script:F_Browse_obj.FileName
-        if ((Get-DiskImage -ImagePath $syncHash.Control_Prepare_Tbx_Vhdx.Text).Attached) {
-            F_Regex -field 'Control_Prepare_Tbx_Vhdx' -field_value $syncHash.Control_Prepare_Tbx_Vhdx.Text -nocondition -message $Text_SafeOS.Prepare_VHDX_IsMounted
-            $syncHash.Control_Prepare_Btn_Next.IsEnabled = $false
-        }
-        else {
-            F_Regex -field 'Control_Prepare_Tbx_Vhdx' -field_value $syncHash.Control_Prepare_Tbx_Vhdx.Text
-            F_VerifyFields_Prepare
-        }
+    F_Browse_Folder -title "Select ASDK Path"
+    if ($Script:F_Browse_obj.SelectedPath) {
+        $syncHash.Control_Prepare_Tbx_Vhdx.Text = $Script:F_Browse_obj.SelectedPath
     }
 })
 
@@ -2635,12 +2531,6 @@ $syncHash.Control_Creds_Btn_Previous.Add_Click({
     $syncHash.Control_Header_Tbl_Title.Text = $Text_Install.Mode_Title
 
     $Script:Restore = $false
-    $syncHash.Control_Creds_Cbx_Idp.Items.Remove("(Imported from backup data)")
-    $syncHash.Control_Creds_Cbx_Idp.FontStyle = "Normal"
-    $syncHash.Control_Creds_Cbx_Idp.IsEnabled = $true
-
-    $syncHash.Control_Creds_Tbx_AADTenant.Text.Clear()
-    $syncHash.Control_Creds_Tbx_AADTenant.IsEnabled = $false
 
     $syncHash.Control_Creds_Pwb_LocalPassword.Clear()
 })
@@ -2664,25 +2554,6 @@ $syncHash.Control_Creds_Btn_Next.Add_Click({
 
 $syncHash.Control_Creds_Pwb_LocalPassword.Add_PasswordChanged({
 $syncHash.Control_Creds_Tbl_ErrorMessage.Visibility='Hidden'  
-})
-
-$syncHash.Control_Creds_Cbx_Idp.Add_SelectionChanged({
-    If ($syncHash.Control_Creds_Cbx_Idp.SelectedItem -eq 'ADFS') {
-        $syncHash.Control_Creds_Tbx_AADTenant.Clear()
-        $syncHash.Control_Creds_Tbx_AADTenant.IsEnabled = $false
-        $syncHash.Control_Creds_Pwb_LocalPassword.IsEnabled = $true
-    }
-    Else {
-        $syncHash.Control_Creds_Tbx_AADTenant.Clear()
-        $syncHash.Control_Creds_Tbx_AADTenant.IsEnabled = $true
-        $syncHash.Control_Creds_Pwb_LocalPassword.IsEnabled = $true
-    }
-    F_VerifyFields_Creds
-})
-
-$syncHash.Control_Creds_Tbx_AADTenant.Add_TextChanged({
-    F_Regex -field 'Control_Creds_Tbx_AADTenant' -field_value $syncHash.Control_Creds_Tbx_AADTenant.Text -regex $Regex.Fqdn -message $Text_Generic.Regex_Fqdn
-    F_VerifyFields_Creds
 })
 
 $syncHash.Control_Creds_Pwb_LocalPassword.Add_PasswordChanged({
